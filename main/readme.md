@@ -1,5 +1,15 @@
 # ![SVGNest](http://svgnest.com/github/logo2.png)
 
+
+## 如何编译运行
+
+细节参见 “技术入口.deepnest分析.md”
+
+    npm run configure
+    npm run build
+    npm run start
+
+
 **SVGNest**: A browser-based vector nesting tool.
 
 **Demo:** http://svgnest.com

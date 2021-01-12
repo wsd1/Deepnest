@@ -92,7 +92,7 @@ function createMainWindow() {
   mainWindow.setMenu(null);
 
   // Open the DevTools.
-  //mainWindow.webContents.openDevTools()
+  mainWindow.webContents.openDevTools()
 
   // Emitted when the window is closed.
   mainWindow.on('closed', function () {
@@ -110,10 +110,11 @@ function createBackgroundWindows() {
 	// used to have 8, now just 1 background window
 	if(winCount < 1){
 		var back = new BrowserWindow({
-			show: false
+			show: true
 		});
 		
-		//back.webContents.openDevTools();
+    back.webContents.openDevTools();
+    
 		
 		back.loadURL(url.format({
 			pathname: path.join(__dirname, './main/background.html'),
@@ -172,7 +173,7 @@ app.on('before-quit', function(){
 //ipcMain.on('background-start', (event, payload) => backgroundWindows[0].webContents.send('background-start', payload));
 
 ipcMain.on('background-start', function(event, payload){
-	console.log('starting background!');
+	//console.log('starting background!');
 	for(var i=0; i<backgroundWindows.length; i++){
 		if(backgroundWindows[i] && !backgroundWindows[i].isBusy){
 			backgroundWindows[i].isBusy = true;

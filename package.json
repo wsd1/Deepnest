@@ -4,10 +4,10 @@
   "description": "Deep nesting for Laser and CNC",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "electron .  --inspect",
     "configure": "node-gyp configure --release",
-    "build": "node-gyp rebuild --target=1.4.8 --arch=x64 --dist-url=https://atom.io/download/atom-shell",
-    "clean": "node-gyp clean configure build --verbose --target=1.4.8 --arch=ia32 --dist-url=https://atom.io/download/atom-shell",
+    "build": "node-gyp rebuild --target=1.8.8 --arch=x64 --dist-url=https://atom.io/download/atom-shell",
+    "clean": "node-gyp clean configure build --verbose --target=1.8.8 --arch=ia32 --dist-url=https://atom.io/download/atom-shell",
     "pack": "build --dir",
     "dist": "build"
   },

@@ -1,21 +1,21 @@
 'use strict';
 
 
-function clone(nfp){
+function clone(nfp) {
 	var newnfp = [];
-	for(var i=0; i<nfp.length; i++){
+	for (var i = 0; i < nfp.length; i++) {
 		newnfp.push({
 			x: nfp[i].x,
 			y: nfp[i].y
 		});
 	}
-	
-	if(nfp.children && nfp.children.length > 0){
+
+	if (nfp.children && nfp.children.length > 0) {
 		newnfp.children = [];
-		for(i=0; i<nfp.children.length; i++){
+		for (i = 0; i < nfp.children.length; i++) {
 			var child = nfp.children[i];
 			var newchild = [];
-			for(var j=0; j<child.length; j++){
+			for (var j = 0; j < child.length; j++) {
 				newchild.push({
 					x: child[j].x,
 					y: child[j].y
@@ -24,37 +24,38 @@ function clone(nfp){
 			newnfp.children.push(newchild);
 		}
 	}
-	
+
 	return newnfp;
 }
 
-function cloneNfp(nfp, inner){
-	if(!inner){
+//提取nfp，inner表示提取之中数组
+function cloneNfp(nfp, inner) {
+	if (!inner) {
 		return clone(nfp);
 	}
-	
+
 	// inner nfp is actually an array of nfps
 	var newnfp = [];
-	for(var i=0; i<nfp.length; i++){
+	for (var i = 0; i < nfp.length; i++) {
 		newnfp.push(clone(nfp[i]));
 	}
-	
+
 	return newnfp;
 }
 
 window.db = {
-	has: function(obj){
-		var key = 'A'+obj.A+'B'+obj.B+'Arot'+parseInt(obj.Arotation)+'Brot'+parseInt(obj.Brotation);
-		if(window.nfpcache[key]){
+	has: function (obj) {
+		var key = 'A' + obj.A + 'B' + obj.B + 'Arot' + parseInt(obj.Arotation) + 'Brot' + parseInt(obj.Brotation);
+		if (window.nfpcache[key]) {
 			return true;
 		}
 		return false;
 	},
-	
-	find : function(obj, inner){
-		var key = 'A'+obj.A+'B'+obj.B+'Arot'+parseInt(obj.Arotation)+'Brot'+parseInt(obj.Brotation);
+
+	find: function (obj, inner) {
+		var key = 'A' + obj.A + 'B' + obj.B + 'Arot' + parseInt(obj.Arotation) + 'Brot' + parseInt(obj.Brotation);
 		//console.log('key: ', key);
-		if(window.nfpcache[key]){
+		if (window.nfpcache[key]) {
 			return cloneNfp(window.nfpcache[key], inner);
 		}
 		/*var keypath = './nfpcache/'+key+'.json';
@@ -76,15 +77,15 @@ window.db = {
 		}*/
 		return null;
 	},
-	
-	insert : function(obj, inner){
-		var key = 'A'+obj.A+'B'+obj.B+'Arot'+parseInt(obj.Arotation)+'Brot'+parseInt(obj.Brotation);
-		if(window.performance.memory.totalJSHeapSize < 0.8*window.performance.memory.jsHeapSizeLimit){
+
+	insert: function (obj, inner) {
+		var key = 'A' + obj.A + 'B' + obj.B + 'Arot' + parseInt(obj.Arotation) + 'Brot' + parseInt(obj.Brotation);
+		if (window.performance.memory.totalJSHeapSize < 0.8 * window.performance.memory.jsHeapSizeLimit) {
 			window.nfpcache[key] = cloneNfp(obj.nfp, inner);
 			//console.log('cached: ',window.cache[key].poly);
 			//console.log('using', window.performance.memory.totalJSHeapSize/window.performance.memory.jsHeapSizeLimit);
 		}
-		
+
 		/*obj.children = obj.nfp.children;
 		
 		var keypath = './nfpcache/'+key+'.json';
@@ -99,54 +100,66 @@ window.db = {
 window.onload = function () {
 	const { ipcRenderer } = require('electron');
 	window.ipcRenderer = ipcRenderer;
-	window.addon = require('../minkowski/Release/addon');
-	
+	window.addon = require('../build/Release/addon');
+
 	window.path = require('path')
 	window.url = require('url')
 	window.fs = require('graceful-fs');
 	window.FileQueue = require('filequeue');
 	window.fq = new FileQueue(500);
-	
+
 	window.nfpcache = {};
-	  
+
 	ipcRenderer.on('background-start', (event, data) => {
 		var index = data.index;
-	    var individual = data.individual;
+		var individual = data.individual;
 
-	    var parts = individual.placement;
+		var parts = individual.placement;
 		var rotations = individual.rotation;
 		var ids = data.ids;
 		var sources = data.sources;
 		var children = data.children;
-		
-		for(var i=0; i<parts.length; i++){
+
+		//不知道什么原因  把原先 parts的成员都flat之后，传递到这里。这里恢复到 parts中
+		for (var i = 0; i < parts.length; i++) {
 			parts[i].rotation = rotations[i];
 			parts[i].id = ids[i];
 			parts[i].source = sources[i];
-			if(!data.config.simplify){
+			if (!data.config.simplify) {
 				parts[i].children = children[i];
 			}
 		}
-		
-		for(i=0; i<data.sheets.length; i++){
+		//parts: [{children, id, source, 0:{x, y}, 1:{x, y},2:{x, y},...}, ...]
+
+		for (i = 0; i < data.sheets.length; i++) {
 			data.sheets[i].id = data.sheetids[i];
 			data.sheets[i].source = data.sheetsources[i];
 			data.sheets[i].children = data.sheetchildren[i];
 		}
-		
+		//data.sheets: [{children, id, source, 0:{x, y}, 1:{x, y},2:{x, y},...}, ...]
+
+
+
+
+
+
+
+		//下面开始组织 不同形状的捉对 
+
 		// preprocess
 		var pairs = [];
-		var inpairs = function(key, p){
-			for(var i=0; i<p.length; i++){
-				if(p[i].Asource == key.Asource && p[i].Bsource == key.Bsource && p[i].Arotation == key.Arotation && p[i].Brotation == key.Brotation){
+		//inpairs()函数用于判断当前 pair是否在 数组 pairs[]中存在
+		var inpairs = function (key, p) {
+			for (var i = 0; i < p.length; i++) {
+				if (p[i].Asource == key.Asource && p[i].Bsource == key.Bsource && p[i].Arotation == key.Arotation && p[i].Brotation == key.Brotation) {
 					return true;
 				}
 			}
 			return false;
 		}
-		for(var i=0; i<parts.length; i++){
+		for (var i = 0; i < parts.length; i++) {
 			var B = parts[i];
-			for(var j=0; j<i; j++){
+			for (var j = 0; j < i; j++) {
 				var A = parts[j];
 				var key = {
 					A: A,
@@ -162,170 +175,195 @@ window.onload = function () {
 					Arotation: A.rotation,
 					Brotation: B.rotation
 				}
-				if(!inpairs(key, pairs) && !db.has(doc)){
+				if (!inpairs(key, pairs) && !db.has(doc)) {
 					pairs.push(key);
 				}
 			}
 		}
-		
-		console.log('pairs: ',pairs.length);
-		  
-		  var process = function(pair){
-			
+
+
+		//上面将所有 parts做好两两组合放入 pairs[]中。
+
+
+
+
+
+
+
+
+		console.log('pairs: ', pairs.length);
+
+		//先旋转 A B， 再计算 AB的外nfp
+		var process = function (pair) {
+
+			//先旋转
+
 			var A = rotatePolygon(pair.A, pair.Arotation);
 			var B = rotatePolygon(pair.B, pair.Brotation);
-			
+
+
+			//下面做 外轮廓 nfp
 			var clipper = new ClipperLib.Clipper();
-			
+
 			var Ac = toClipperCoordinates(A);
 			ClipperLib.JS.ScaleUpPath(Ac, 10000000);
 			var Bc = toClipperCoordinates(B);
 			ClipperLib.JS.ScaleUpPath(Bc, 10000000);
-			for(var i=0; i<Bc.length; i++){
+			for (var i = 0; i < Bc.length; i++) {
 				Bc[i].X *= -1;
 				Bc[i].Y *= -1;
 			}
 			var solution = ClipperLib.Clipper.MinkowskiSum(Ac, Bc, true);
 			var clipperNfp;
-		
+
 			var largestArea = null;
-			for(i=0; i<solution.length; i++){
+			for (i = 0; i < solution.length; i++) {
 				var n = toNestCoordinates(solution[i], 10000000);
 				var sarea = -GeometryUtil.polygonArea(n);
-				if(largestArea === null || largestArea < sarea){
+				if (largestArea === null || largestArea < sarea) {
 					clipperNfp = n;
 					largestArea = sarea;
 				}
 			}
-			
-			for(var i=0; i<clipperNfp.length; i++){
+
+			//这里应该是对B的第一个点 做个偏移计算
+			for (var i = 0; i < clipperNfp.length; i++) {
 				clipperNfp[i].x += B[0].x;
 				clipperNfp[i].y += B[0].y;
 			}
-			
+
 			pair.A = null;
 			pair.B = null;
 			pair.nfp = clipperNfp;
 			return pair;
-			
-			function toClipperCoordinates(polygon){
+
+			function toClipperCoordinates(polygon) {
 				var clone = [];
-				for(var i=0; i<polygon.length; i++){
+				for (var i = 0; i < polygon.length; i++) {
 					clone.push({
 						X: polygon[i].x,
 						Y: polygon[i].y
 					});
 				}
-	
+
 				return clone;
 			};
-			
-			function toNestCoordinates(polygon, scale){
+
+			function toNestCoordinates(polygon, scale) {
 				var clone = [];
-				for(var i=0; i<polygon.length; i++){
+				for (var i = 0; i < polygon.length; i++) {
 					clone.push({
-						x: polygon[i].X/scale,
-						y: polygon[i].Y/scale
+						x: polygon[i].X / scale,
+						y: polygon[i].Y / scale
 					});
 				}
-	
+
 				return clone;
 			};
-			
-			function rotatePolygon(polygon, degrees){
+
+			function rotatePolygon(polygon, degrees) {
 				var rotated = [];
 				var angle = degrees * Math.PI / 180;
-				for(var i=0; i<polygon.length; i++){
+				for (var i = 0; i < polygon.length; i++) {
 					var x = polygon[i].x;
 					var y = polygon[i].y;
-					var x1 = x*Math.cos(angle)-y*Math.sin(angle);
-					var y1 = x*Math.sin(angle)+y*Math.cos(angle);
-						
-					rotated.push({x:x1, y:y1});
+					var x1 = x * Math.cos(angle) - y * Math.sin(angle);
+					var y1 = x * Math.sin(angle) + y * Math.cos(angle);
+
+					rotated.push({ x: x1, y: y1 });
 				}
-	
+
 				return rotated;
 			};
-		  }
-		  
-		  // run the placement synchronously
-		  function sync(){
-		  	//console.log('starting synchronous calculations', Object.keys(window.nfpCache).length);
-		  	console.log('in sync');
-		  	var c=0;
-		  	for (var key in window.nfpcache) {
+		}
+
+		// run the placement synchronously
+		function sync() {
+			//console.log('starting synchronous calculations', Object.keys(window.nfpCache).length);
+			console.log('in sync');
+			var c = 0;
+			for (var key in window.nfpcache) {
 				c++;
 			}
 			console.log('nfp cached:', c);
-		  	var placement = placeParts(data.sheets, parts, data.config, index);
-	
+			var placement = placeParts(data.sheets, parts, data.config, index);
+
 			placement.index = data.index;
 			ipcRenderer.send('background-response', placement);
-		  }
-		  
-		  console.time('Total');
-		  
-		  
-		  if(pairs.length > 0){
-			  var p = new Parallel(pairs, {
+		}
+
+		console.time('Total');
+
+
+		if (pairs.length > 0) {
+			var p = new Parallel(pairs, {
 				evalPath: 'util/eval.js',
 				synchronous: false
-			  });
-			  
-			  var spawncount = 0;
-				
-				p._spawnMapWorker = function (i, cb, done, env, wrk){
-					// hijack the worker call to check progress
-					ipcRenderer.send('background-progress', {index: index, progress: 0.5*(spawncount++/pairs.length)});
-					return Parallel.prototype._spawnMapWorker.call(p, i, cb, done, env, wrk);
-				}
-			  
-			  p.require('clipper.js');
-			  p.require('geometryutil.js');
-		  
-			  p.map(process).then(function(processed){
-			  	 function getPart(source){
-					for(var k=0; k<parts.length; k++){
-						if(parts[k].source == source){
+			});
+
+			var spawncount = 0;
+
+			p._spawnMapWorker = function (i, cb, done, env, wrk) {
+				// hijack the worker call to check progress
+				ipcRenderer.send('background-progress', { index: index, progress: 0.5 * (spawncount++ / pairs.length) });
+				return Parallel.prototype._spawnMapWorker.call(p, i, cb, done, env, wrk);
+			}
+
+			p.require('clipper.js');
+			p.require('geometryutil.js');
+
+			//对每一个 pair 做map 先 process() => function (processed) 这里
+
+			// process()  处理 外轮廓 nfp
+			// 这里处理 A的孔 与 B的 内nfp
+
+			p.map(process).then(function (processed) {
+				function getPart(source) {
+					for (var k = 0; k < parts.length; k++) {
+						if (parts[k].source == source) {
 							return parts[k];
 						}
 					}
 					return null;
-				  }
+				}
 				// store processed data in cache
-				for(var i=0; i<processed.length; i++){
+				for (var i = 0; i < processed.length; i++) {
 					// returned data only contains outer nfp, we have to account for any holes separately in the synchronous portion
-					// this is because the c++ addon which can process interior nfps cannot run in the worker thread					
+					// this is because the c++ addon which can process interior nfps cannot run in the worker thread	
+					// 这里说 addon 可以处理内孔 nfp，但是没法运行在 worker 上（web worker）				
 					var A = getPart(processed[i].Asource);
 					var B = getPart(processed[i].Bsource);
-										
+
 					var Achildren = [];
-					
+
 					var j;
-					if(A.children){
-						for(j=0; j<A.children.length; j++){
+					if (A.children) {
+						for (j = 0; j < A.children.length; j++) {
 							Achildren.push(rotatePolygon(A.children[j], processed[i].Arotation));
 						}
 					}
-					
-					if(Achildren.length > 0){
+
+					//下面计算 转动后的A的孔 与B的nfp
+					if (Achildren.length > 0) {
 						var Brotated = rotatePolygon(B, processed[i].Brotation);
 						var bbounds = GeometryUtil.getPolygonBounds(Brotated);
 						var cnfp = [];
-						
-						for(j=0; j<Achildren.length; j++){
+
+						for (j = 0; j < Achildren.length; j++) { //对每一个A的孔 做处理
+
+							//下面比较，A的孔的bbox大于B 就计算一下 A孔与B的nfp
 							var cbounds = GeometryUtil.getPolygonBounds(Achildren[j]);
-							if(cbounds.width > bbounds.width && cbounds.height > bbounds.height){
+							if (cbounds.width > bbounds.width && cbounds.height > bbounds.height) {
 								var n = getInnerNfp(Achildren[j], Brotated, data.config);
-								if(n && n.length > 0){
+								if (n && n.length > 0) {
 									cnfp = cnfp.concat(n);
 								}
 							}
 						}
-						
+
 						processed[i].nfp.children = cnfp;
 					}
-					
+
 					var doc = {
 						A: processed[i].Asource,
 						B: processed[i].Bsource,
@@ -334,193 +372,196 @@ window.onload = function () {
 						nfp: processed[i].nfp
 					};
 					window.db.insert(doc);
-					
+
 				}
 				console.timeEnd('Total');
 				console.log('before sync');
 				sync();
-			  });
-		  }
-		  else{
-		  	sync();
-		  }
+			});
+		}
+		else {
+			sync();
+		}
 	});
 };
 
 // returns the square of the length of any merged lines
 // filter out any lines less than minlength long
-function mergedLength(parts, p, minlength, tolerance){
-	var min2 = minlength*minlength;
+function mergedLength(parts, p, minlength, tolerance) {
+	var min2 = minlength * minlength;
 	var totalLength = 0;
 	var segments = [];
-	
-	for(var i=0; i<p.length; i++){
-		var A1 = p[i];
-		
-		if(i+1 == p.length){
+
+	for (var i = 0; i < p.length; i++) {
+		//取相邻点 A1 A2
+		var A1 = p[i], A2;
+		if (i + 1 == p.length)
 			A2 = p[0];
-		}
-		else{
-			var A2 = p[i+1];
-		}
-		
-		if(!A1.exact || !A2.exact){
+		else
+			A2 = p[i + 1];
+
+		//必须是原始polygon上的点
+		if (!A1.exact || !A2.exact) {
 			continue;
 		}
-		
-		var Ax2 = (A2.x-A1.x)*(A2.x-A1.x);
-		var Ay2 = (A2.y-A1.y)*(A2.y-A1.y);
-		
-		if(Ax2+Ay2 < min2){
+
+		//距离不能太近
+		var Ax2 = (A2.x - A1.x) * (A2.x - A1.x);
+		var Ay2 = (A2.y - A1.y) * (A2.y - A1.y);
+		if (Ax2 + Ay2 < min2) {
 			continue;
 		}
-		
-		var angle = Math.atan2((A2.y-A1.y),(A2.x-A1.x));
+
+		//求取 A1A2 的方向角
+		var angle = Math.atan2((A2.y - A1.y), (A2.x - A1.x));
 
 		var c = Math.cos(-angle);
 		var s = Math.sin(-angle);
-		
+
 		var c2 = Math.cos(angle);
 		var s2 = Math.sin(angle);
-		
-		var relA2 = {x: A2.x-A1.x, y: A2.y-A1.y};
+
+		var relA2 = { x: A2.x - A1.x, y: A2.y - A1.y }; //A1A2向量
 		var rotA2x = relA2.x * c - relA2.y * s;
-				
-		for(var j=0; j<parts.length; j++){
+
+		//怪怪 居然是遍历所有 part 所有边
+		for (var j = 0; j < parts.length; j++) {
 			var B = parts[j];
-			if(B.length > 1){
-				for(var k=0; k<B.length; k++){
+			if (B.length > 1) {
+				for (var k = 0; k < B.length; k++) {
 					var B1 = B[k];
-					
-					if(k+1 == B.length){
+
+					if (k + 1 == B.length) {
 						var B2 = B[0];
 					}
-					else{
-						var B2 = B[k+1];
+					else {
+						var B2 = B[k + 1];
 					}
-					
-					if(!B1.exact || !B2.exact){
+
+					if (!B1.exact || !B2.exact) {
 						continue;
 					}
-					var Bx2 = (B2.x-B1.x)*(B2.x-B1.x);
-					var By2 = (B2.y-B1.y)*(B2.y-B1.y);
-					
-					if(Bx2+By2 < min2){
+					var Bx2 = (B2.x - B1.x) * (B2.x - B1.x);
+					var By2 = (B2.y - B1.y) * (B2.y - B1.y);
+
+					if (Bx2 + By2 < min2) {
 						continue;
 					}
-					
+
 					// B relative to A1 (our point of rotation)
-					var relB1 = {x: B1.x - A1.x, y: B1.y - A1.y};
-					var relB2 = {x: B2.x - A1.x, y: B2.y - A1.y};
-					
-					
+					var relB1 = { x: B1.x - A1.x, y: B1.y - A1.y };
+					var relB2 = { x: B2.x - A1.x, y: B2.y - A1.y };
+
+
 					// rotate such that A1 and A2 are horizontal
-					var rotB1 = {x: relB1.x * c - relB1.y * s, y: relB1.x * s + relB1.y * c};
-					var rotB2 = {x: relB2.x * c - relB2.y * s, y: relB2.x * s + relB2.y * c};
-					
-					if(!GeometryUtil.almostEqual(rotB1.y, 0, tolerance) || !GeometryUtil.almostEqual(rotB2.y, 0, tolerance)){
+					var rotB1 = { x: relB1.x * c - relB1.y * s, y: relB1.x * s + relB1.y * c };
+					var rotB2 = { x: relB2.x * c - relB2.y * s, y: relB2.x * s + relB2.y * c };
+
+					if (!GeometryUtil.almostEqual(rotB1.y, 0, tolerance) || !GeometryUtil.almostEqual(rotB2.y, 0, tolerance)) {
 						continue;
 					}
-					
+
 					var min1 = Math.min(0, rotA2x);
 					var max1 = Math.max(0, rotA2x);
-					
+
 					var min2 = Math.min(rotB1.x, rotB2.x);
 					var max2 = Math.max(rotB1.x, rotB2.x);
-					
+
 					// not overlapping
-					if(min2 >= max1 || max2 <= min1){
+					if (min2 >= max1 || max2 <= min1) {
 						continue;
 					}
-					
+
 					var len = 0;
 					var relC1x = 0;
 					var relC2x = 0;
-					
+
 					// A is B
-					if(GeometryUtil.almostEqual(min1, min2) && GeometryUtil.almostEqual(max1, max2)){
-						len = max1-min1;
+					if (GeometryUtil.almostEqual(min1, min2) && GeometryUtil.almostEqual(max1, max2)) {
+						len = max1 - min1;
 						relC1x = min1;
 						relC2x = max1;
 					}
 					// A inside B
-					else if(min1 > min2 && max1 < max2){
-						len = max1-min1;
+					else if (min1 > min2 && max1 < max2) {
+						len = max1 - min1;
 						relC1x = min1;
 						relC2x = max1;
 					}
 					// B inside A
-					else if(min2 > min1 && max2 < max1){
-						len = max2-min2;
+					else if (min2 > min1 && max2 < max1) {
+						len = max2 - min2;
 						relC1x = min2;
 						relC2x = max2;
 					}
-					else{
+					else {
 						len = Math.max(0, Math.min(max1, max2) - Math.max(min1, min2));
 						relC1x = Math.min(max1, max2);
-						relC2x = Math.max(min1, min2);		
+						relC2x = Math.max(min1, min2);
 					}
-					
-					if(len*len > min2){
+
+					if (len * len > min2) {
 						totalLength += len;
-						
-						var relC1 = {x: relC1x * c2, y: relC1x * s2};
-						var relC2 = {x: relC2x * c2, y: relC2x * s2};
-						
-						var C1 = {x: relC1.x + A1.x, y: relC1.y + A1.y};
-						var C2 = {x: relC2.x + A1.x, y: relC2.y + A1.y};
-						
+
+						var relC1 = { x: relC1x * c2, y: relC1x * s2 };
+						var relC2 = { x: relC2x * c2, y: relC2x * s2 };
+
+						var C1 = { x: relC1.x + A1.x, y: relC1.y + A1.y };
+						var C2 = { x: relC2.x + A1.x, y: relC2.y + A1.y };
+
 						segments.push([C1, C2]);
 					}
 				}
 			}
-			
-			if(B.children && B.children.length > 0){
+
+			if (B.children && B.children.length > 0) {
 				var child = mergedLength(B.children, p, minlength, tolerance);
 				totalLength += child.totalLength;
 				segments = segments.concat(child.segments);
 			}
 		}
 	}
-	
-	return {totalLength: totalLength, segments: segments};
+
+	return { totalLength: totalLength, segments: segments };
 }
 
-function shiftPolygon(p, shift){
+function shiftPolygon(p, shift) {
 	var shifted = [];
-	for(var i=0; i<p.length; i++){
-		shifted.push({x: p[i].x+shift.x, y:p[i].y+shift.y, exact: p[i].exact});
+	for (var i = 0; i < p.length; i++) {
+		shifted.push({ x: p[i].x + shift.x, y: p[i].y + shift.y, exact: p[i].exact });
 	}
-	if(p.children && p.children.length){
+	if (p.children && p.children.length) {
 		shifted.children = [];
-		for(i=0; i<p.children.length; i++){
+		for (i = 0; i < p.children.length; i++) {
 			shifted.children.push(shiftPolygon(p.children[i], shift));
 		}
 	}
-	
+
 	return shifted;
 }
 // jsClipper uses X/Y instead of x/y...
-function toClipperCoordinates(polygon){
+function toClipperCoordinates(polygon) {
 	var clone = [];
-	for(var i=0; i<polygon.length; i++){
+	for (var i = 0; i < polygon.length; i++) {
 		clone.push({
 			X: polygon[i].x,
 			Y: polygon[i].y
 		});
 	}
-	
+
 	return clone;
 };
 
+
+//该函数 会兼顾children，会通过wind方向来指示其为孔，并将结构压平，发还线条数组，孔会被放置在开头
 // returns clipper nfp. Remember that clipper nfp are a list of polygons, not a tree!
-function nfpToClipperCoordinates(nfp, config){
+function nfpToClipperCoordinates(nfp, config) {
 	var clipperNfp = [];
-	
+
 	// children first
-	if(nfp.children && nfp.children.length > 0){
-		for(var j=0; j<nfp.children.length; j++){
-			if(GeometryUtil.polygonArea(nfp.children[j]) < 0){
+	if (nfp.children && nfp.children.length > 0) {
+		for (var j = 0; j < nfp.children.length; j++) {
+			if (GeometryUtil.polygonArea(nfp.children[j]) < 0) {	//做纠正 如果孔是逆时针 那么调换方向
 				nfp.children[j].reverse();
 			}
 			var childNfp = toClipperCoordinates(nfp.children[j]);
@@ -528,48 +569,49 @@ function nfpToClipperCoordinates(nfp, config){
 			clipperNfp.push(childNfp);
 		}
 	}
-	
-	if(GeometryUtil.polygonArea(nfp) > 0){
+
+	//如果外框是顺时针 那么改为逆时针
+	if (GeometryUtil.polygonArea(nfp) > 0) {
 		nfp.reverse();
 	}
-	
+
 	var outerNfp = toClipperCoordinates(nfp);
-	
+
 	// clipper js defines holes based on orientation
 
 	ClipperLib.JS.ScaleUpPath(outerNfp, config.clipperScale);
 	//var cleaned = ClipperLib.Clipper.CleanPolygon(outerNfp, 0.00001*config.clipperScale);
-	
+
 	clipperNfp.push(outerNfp);
 	//var area = Math.abs(ClipperLib.Clipper.Area(cleaned));
-	
+
 	return clipperNfp;
 }
 
 // inner nfps can be an array of nfps, outer nfps are always singular
-function innerNfpToClipperCoordinates(nfp, config){
+function innerNfpToClipperCoordinates(nfp, config) {
 	var clipperNfp = [];
-	for(var i=0; i<nfp.length; i++){
+	for (var i = 0; i < nfp.length; i++) {
 		var clip = nfpToClipperCoordinates(nfp[i], config);
 		clipperNfp = clipperNfp.concat(clip);
 	}
-	
+
 	return clipperNfp;
 }
 
-function toNestCoordinates(polygon, scale){
+function toNestCoordinates(polygon, scale) {
 	var clone = [];
-	for(var i=0; i<polygon.length; i++){
+	for (var i = 0; i < polygon.length; i++) {
 		clone.push({
-			x: polygon[i].X/scale,
-			y: polygon[i].Y/scale
+			x: polygon[i].X / scale,
+			y: polygon[i].Y / scale
 		});
 	}
-	
+
 	return clone;
 };
 
-function getHull(polygon){
+function getHull(polygon) {
 	// convert to hulljs format
 	/*var hull = new ConvexHullGrahamScan();
 	for(var i=0; i<polygon.length; i++){
@@ -578,48 +620,51 @@ function getHull(polygon){
 	
 	return hull.getHull();*/
 	var points = [];
-	for(var i=0; i<polygon.length; i++){
+	for (var i = 0; i < polygon.length; i++) {
 		points.push([polygon[i].x, polygon[i].y]);
 	}
 	var hullpoints = d3.polygonHull(points);
-	
-	if(!hullpoints){
+
+	if (!hullpoints) {
 		return polygon;
 	}
-	
+
 	var hull = [];
-	for(i=0; i<hullpoints.length; i++){
-		hull.push({x: hullpoints[i][0], y: hullpoints[i][1]});
+	for (i = 0; i < hullpoints.length; i++) {
+		hull.push({ x: hullpoints[i][0], y: hullpoints[i][1] });
 	}
-	
+
 	return hull;
 }
 
-function rotatePolygon(polygon, degrees){
+function rotatePolygon(polygon, degrees) {
 	var rotated = [];
 	var angle = degrees * Math.PI / 180;
-	for(var i=0; i<polygon.length; i++){
+	for (var i = 0; i < polygon.length; i++) {
 		var x = polygon[i].x;
 		var y = polygon[i].y;
-		var x1 = x*Math.cos(angle)-y*Math.sin(angle);
-		var y1 = x*Math.sin(angle)+y*Math.cos(angle);
-						
-		rotated.push({x:x1, y:y1, exact: polygon[i].exact});
+		var x1 = x * Math.cos(angle) - y * Math.sin(angle);
+		var y1 = x * Math.sin(angle) + y * Math.cos(angle);
+
+		rotated.push({ x: x1, y: y1, exact: polygon[i].exact });
 	}
-	
-	if(polygon.children && polygon.children.length > 0){
+
+	if (polygon.children && polygon.children.length > 0) {
 		rotated.children = [];
-		for(var j=0; j<polygon.children.length; j++){
+		for (var j = 0; j < polygon.children.length; j++) {
 			rotated.children.push(rotatePolygon(polygon.children[j], degrees));
 		}
 	}
-	
+
 	return rotated;
 };
 
-function getOuterNfp(A, B, inside){
+
+
+//该函数可以计算包括内孔的 nfp
+function getOuterNfp(A, B, inside) {
 	var nfp;
-	
+
 	/*var numpoly = A.length + B.length;
 	if(A.children && A.children.length > 0){
 		A.children.forEach(function(c){
@@ -631,30 +676,37 @@ function getOuterNfp(A, B, inside){
 			numpoly += c.length;
 		});
 	}*/
-	
+
 	// try the file cache if the calculation will take a long time
 	var doc = window.db.find({ A: A.source, B: B.source, Arotation: A.rotation, Brotation: B.rotation });
-	
-	if(doc){
+	if (doc) {
 		return doc;
 	}
 
-	// not found in cache
-	if(inside || (A.children && A.children.length > 0)){
-	//console.log('computing minkowski: ',A.length, B.length);
-	//console.time('addon');
-	nfp = addon.calculateNFP({A: A, B: B});
-	//console.timeEnd('addon');
+
+
+
+	// A.children 表示有孔 需要计算内部nfp
+	//只要有内孔 需要计算内nfp，那就使用 addon.calculateNFP
+	if (inside || (A.children && A.children.length > 0)) {
+		//console.log('computing minkowski: ',A.length, B.length);
+		console.time('addon.calculateNFP');
+
+		//addon.calculateNFP 是C++编译的  可以支持识别A的children 内部孔
+		nfp = addon.calculateNFP({ A: A, B: B });
+
+		console.timeEnd('addon.calculateNFP');
 	}
-	else{
+	//如果不计算内nfp 就直接使用 ClipperLib.Clipper.MinkowskiSum 计算
+	else {
 		console.log('minkowski', A.length, B.length, A.source, B.source);
 		console.time('clipper');
-	
+
 		var Ac = toClipperCoordinates(A);
 		ClipperLib.JS.ScaleUpPath(Ac, 10000000);
 		var Bc = toClipperCoordinates(B);
 		ClipperLib.JS.ScaleUpPath(Bc, 10000000);
-		for(var i=0; i<Bc.length; i++){
+		for (var i = 0; i < Bc.length; i++) {
 			Bc[i].X *= -1;
 			Bc[i].Y *= -1;
 		}
@@ -662,39 +714,45 @@ function getOuterNfp(A, B, inside){
 		//console.log(solution.length, solution);
 		//var clipperNfp = toNestCoordinates(solution[0], 10000000);
 		var clipperNfp;
-		
+
+		//找出最大面积的 解
 		var largestArea = null;
-		for(i=0; i<solution.length; i++){
+		for (i = 0; i < solution.length; i++) {
 			var n = toNestCoordinates(solution[i], 10000000);
 			var sarea = -GeometryUtil.polygonArea(n);
-			if(largestArea === null || largestArea < sarea){
+			if (largestArea === null || largestArea < sarea) {
 				clipperNfp = n;
 				largestArea = sarea;
 			}
 		}
-		
-		for(var i=0; i<clipperNfp.length; i++){
+
+		//通过B形状 第一个点 偏移 
+		for (var i = 0; i < clipperNfp.length; i++) {
 			clipperNfp[i].x += B[0].x;
 			clipperNfp[i].y += B[0].y;
 		}
-		
+
 		nfp = [clipperNfp];
 		//console.log('clipper nfp', JSON.stringify(nfp));
 		console.timeEnd('clipper');
 	}
-	
-	if(!nfp || nfp.length == 0){
+
+	if (!nfp || nfp.length == 0) {
 		//console.log('holy shit', nfp, A, B, JSON.stringify(A), JSON.stringify(B));
 		return null
 	}
-	
+
+
+
+
+
 	nfp = nfp.pop();
-	
-	if(!nfp || nfp.length == 0){
+
+	if (!nfp || nfp.length == 0) {
 		return null;
 	}
-	
-	if(!inside && typeof A.source !== 'undefined' && typeof B.source !== 'undefined'){
+
+	if (!inside && typeof A.source !== 'undefined' && typeof B.source !== 'undefined') {
 		// insert into db
 		doc = {
 			A: A.source,
@@ -705,89 +763,93 @@ function getOuterNfp(A, B, inside){
 		};
 		window.db.insert(doc);
 	}
-	
+
 	return nfp;
 }
-
-function getFrame(A){
+//此函数将 多边形放入一个长宽略大的外框里，返回外框，原形状作为其children
+function getFrame(A) {
 	var bounds = GeometryUtil.getPolygonBounds(A);
-	
+
 	// expand bounds by 10%
-	bounds.width *= 1.1; 
+	bounds.width *= 1.1;
 	bounds.height *= 1.1;
-	bounds.x -= 0.5*(bounds.width - (bounds.width/1.1));
-	bounds.y -= 0.5*(bounds.height - (bounds.height/1.1));
-	
+	bounds.x -= 0.5 * (bounds.width - (bounds.width / 1.1));
+	bounds.y -= 0.5 * (bounds.height - (bounds.height / 1.1));
+
 	var frame = [];
 	frame.push({ x: bounds.x, y: bounds.y });
-	frame.push({ x: bounds.x+bounds.width, y: bounds.y });
-	frame.push({ x: bounds.x+bounds.width, y: bounds.y+bounds.height });
-	frame.push({ x: bounds.x, y: bounds.y+bounds.height });
-	
+	frame.push({ x: bounds.x + bounds.width, y: bounds.y });
+	frame.push({ x: bounds.x + bounds.width, y: bounds.y + bounds.height });
+	frame.push({ x: bounds.x, y: bounds.y + bounds.height });
+
 	frame.children = [A];
 	frame.source = A.source;
 	frame.rotation = 0;
-	
+
 	return frame;
 }
 
-function getInnerNfp(A, B, config){
-	if(typeof A.source !== 'undefined' && typeof B.source !== 'undefined'){
+function getInnerNfp(A, B, config) {
+	if (typeof A.source !== 'undefined' && typeof B.source !== 'undefined') {
 		var doc = window.db.find({ A: A.source, B: B.source, Arotation: 0, Brotation: B.rotation }, true);
-	
-		if(doc){
+
+		if (doc) {
 			//console.log('fetch inner', A.source, B.source, doc);
 			return doc;
 		}
 	}
-	
-	var frame = getFrame(A);
-	
+
+	var frame = getFrame(A); //这个步骤 为A加一个外框，这样A就成了内孔  使用 OuterNfp 来计算 InnerNfp
+
 	var nfp = getOuterNfp(frame, B, true);
-		
-	if(!nfp || !nfp.children || nfp.children.length == 0){
+
+	//由于主角A做了孔，计算出来的nfp必然只需要children
+	if (!nfp || !nfp.children || nfp.children.length == 0) {
 		return null;
 	}
-	
+
+	//至于A的孔 那就要 做真正的 outerNfp 
 	var holes = [];
-	if(A.children && A.children.length > 0){
-		for(var i=0; i<A.children.length; i++){
+	if (A.children && A.children.length > 0) {
+		for (var i = 0; i < A.children.length; i++) {
 			var hnfp = getOuterNfp(A.children[i], B);
-			if(hnfp){
+			if (hnfp) {
 				holes.push(hnfp);
 			}
 		}
 	}
-		
-	if(holes.length == 0){
-		return nfp.children;
+
+	if (holes.length == 0) {
+		return nfp.children;	//如果A没有孔需要去计算内部 nfp，那么直接返回 A的外nfp
 	}
-	
+
+
+	//如果图形内部有孔，那么其内nfp肯定是 外框内nfp 减去  内孔外nfp。下面做减法运算
 	var clipperNfp = innerNfpToClipperCoordinates(nfp.children, config);
 	var clipperHoles = innerNfpToClipperCoordinates(holes, config);
-	
+
 	var finalNfp = new ClipperLib.Paths();
 	var clipper = new ClipperLib.Clipper();
-	
+
 	clipper.AddPaths(clipperHoles, ClipperLib.PolyType.ptClip, true);
 	clipper.AddPaths(clipperNfp, ClipperLib.PolyType.ptSubject, true);
-	
-	if(!clipper.Execute(ClipperLib.ClipType.ctDifference, finalNfp, ClipperLib.PolyFillType.pftNonZero, ClipperLib.PolyFillType.pftNonZero)){
+
+	if (!clipper.Execute(ClipperLib.ClipType.ctDifference, finalNfp, ClipperLib.PolyFillType.pftNonZero, ClipperLib.PolyFillType.pftNonZero)) {
 		return nfp.children;
 	}
-	
-	if(finalNfp.length == 0){
+
+	if (finalNfp.length == 0) {
 		return null;
 	}
-	
+
 	var f = [];
-	for(var i=0; i<finalNfp.length; i++){
+	for (var i = 0; i < finalNfp.length; i++) {
 		f.push(toNestCoordinates(finalNfp[i], config.clipperScale));
 	}
-	
-	if(typeof A.source !== 'undefined' && typeof B.source !== 'undefined'){
+
+	if (typeof A.source !== 'undefined' && typeof B.source !== 'undefined') {
 		// insert into db
-		console.log('inserting inner: ',A.source, B.source, B.rotation, f);
+		console.log('inserting inner: ', A.source, B.source, B.rotation, f);
 		var doc = {
 			A: A.source,
 			B: B.source,
@@ -797,101 +859,116 @@ function getInnerNfp(A, B, config){
 		};
 		window.db.insert(doc, true);
 	}
-	
+
 	return f;
 }
 
-function placeParts(sheets, parts, config, nestindex){
+function placeParts(sheets, parts, config, nestindex) {
 
-	if(!sheets){
+	if (!sheets) {
 		return null;
 	}
-	
+
 	var i, j, k, m, n, part;
-	
+
 	var totalnum = parts.length;
 	var totalsheetarea = 0;
-	
+
 	// total length of merged lines
 	var totalMerged = 0;
-		
+
 	// rotate paths by given rotation
 	var rotated = [];
-	for(i=0; i<parts.length; i++){
+	for (i = 0; i < parts.length; i++) {
 		var r = rotatePolygon(parts[i], parts[i].rotation);
 		r.rotation = parts[i].rotation;
 		r.source = parts[i].source;
 		r.id = parts[i].id;
-		
+
 		rotated.push(r);
 	}
-	
+
 	parts = rotated;
-	
+
 	var allplacements = [];
 	var fitness = 0;
 	//var binarea = Math.abs(GeometryUtil.polygonArea(self.binPolygon));
-	
+
 	var key, nfp;
 	var part;
-	
-	while(parts.length > 0){
-		
+
+	while (parts.length > 0) {
+
 		var placed = [];
 		var placements = [];
-		
+
 		// open a new sheet
 		var sheet = sheets.shift();
 		var sheetarea = Math.abs(GeometryUtil.polygonArea(sheet));
 		totalsheetarea += sheetarea;
-		
+
 		fitness += sheetarea; // add 1 for each new sheet opened (lower fitness is better)
-		
+
 		var clipCache = [];
 		//console.log('new sheet');
-		for(i=0; i<parts.length; i++){
+		for (i = 0; i < parts.length; i++) {
 			console.time('placement');
 			part = parts[i];
-			
+
+
+			//step1: innerNfp(sheet, part) 
+
+
 			// inner NFP
-			var sheetNfp = null;				
+			var sheetNfp = null;
 			// try all possible rotations until it fits
 			// (only do this for the first part of each sheet, to ensure that all parts that can be placed are, even if we have to to open a lot of sheets)
-			for(j=0; j<(360/config.rotations); j++){
+
+			//下面尝试形状的所有可行角度，试图放入sheet
+			//for (j = 0; j < (360 / config.rotations); j++) { 这个循环有点怪 应该改一下
+			for (j = 0; j < config.rotations; j++) {
 				sheetNfp = getInnerNfp(sheet, part, config);
-				
-				if(sheetNfp){
-					break;
+
+				if (sheetNfp) {
+					break; //能够放入
 				}
-				
-				var r = rotatePolygon(part, 360/config.rotations);
-				r.rotation = part.rotation + (360/config.rotations);
+
+				var r = rotatePolygon(part, 360 / config.rotations);
+				r.rotation = part.rotation + (360 / config.rotations); //换个姿势
 				r.source = part.source;
 				r.id = part.id;
-				
+
 				// rotation is not in-place
 				part = r;
 				parts[i] = r;
-				
-				if(part.rotation > 360){
-					part.rotation = part.rotation%360;
+
+				if (part.rotation > 360) {
+					part.rotation = part.rotation % 360;
 				}
 			}
+
 			// part unplaceable, skip
-			if(!sheetNfp || sheetNfp.length == 0){
-				continue;
+			if (!sheetNfp || sheetNfp.length == 0) {
+				continue; //当前部件放不下 ，就换一个试试
 			}
-						
+
 			var position = null;
-			
-			if(placed.length == 0){
+
+			//首件摆入逻辑
+			if (placed.length == 0) {
+
+				//在 nfp线条中找到 x,y最小的
 				// first placement, put it on the top left corner
-				for(j=0; j<sheetNfp.length; j++){
-					for(k=0; k<sheetNfp[j].length; k++){
-						if(position === null || sheetNfp[j][k].x-part[0].x < position.x || (GeometryUtil.almostEqual(sheetNfp[j][k].x-part[0].x, position.x) && sheetNfp[j][k].y-part[0].y < position.y ) ){
+				for (j = 0; j < sheetNfp.length; j++) {
+					for (k = 0; k < sheetNfp[j].length; k++) { //注意 sheetNfp 可能是多个多边形（数组）
+
+
+						//关键的摆放位置关系 在这里了 :
+						// sheetNfp[j][k].x - part[0].x 为摆放位置参考点
+						if (position === null || sheetNfp[j][k].x - part[0].x < position.x || (GeometryUtil.almostEqual(sheetNfp[j][k].x - part[0].x, position.x) && sheetNfp[j][k].y - part[0].y < position.y)) {
 							position = {
-								x: sheetNfp[j][k].x-part[0].x,
-								y: sheetNfp[j][k].y-part[0].y,
+								x: sheetNfp[j][k].x - part[0].x,
+								y: sheetNfp[j][k].y - part[0].y,
 								id: part.id,
 								rotation: part.rotation,
 								source: part.source
@@ -899,99 +976,127 @@ function placeParts(sheets, parts, config, nestindex){
 						}
 					}
 				}
-				if(position === null){
+				if (position === null) {
 					console.log(sheetNfp);
 				}
 				placements.push(position);
 				placed.push(part);
-				
+
 				continue;
 			}
-			
+
 			var clipperSheetNfp = innerNfpToClipperCoordinates(sheetNfp, config);
-			
+
+
+			//step2: union([outerNfp(prePlacedPart, part), ... ])
+			//下面开始计算 当前部件和 之前加入的部件之间的 nfp 并集
+
 			var clipper = new ClipperLib.Clipper();
 			var combinedNfp = new ClipperLib.Paths();
-			
+
 			var error = false;
-			
+
 			// check if stored in clip cache
 			//var startindex = 0;
-			var clipkey = 's:'+part.source+'r:'+part.rotation;
+			var clipkey = 's:' + part.source + 'r:' + part.rotation;
 			var startindex = 0;
-			if(clipCache[clipkey]){
-				var prevNfp = clipCache[clipkey].nfp;
+
+			//缓存了不同polygon旋转后的 nfp，第一次进来是空的
+			if (clipCache[clipkey]) {
+				var prevNfp = clipCache[clipkey].nfp; //缓存形如 {'s:1r:90':{index, nfp:[[ClipperLib.IntPoint array], ...]}}
 				clipper.AddPaths(prevNfp, ClipperLib.PolyType.ptSubject, true);
 				startindex = clipCache[clipkey].index;
 			}
-			
-			for(j=startindex; j<placed.length; j++){
-				nfp = getOuterNfp(placed[j], part);
+
+
+			//当前part 依次和前面放入的部件 算nfp，加入偏移。
+			for (j = startindex; j < placed.length; j++) {
+				nfp = getOuterNfp(placed[j], part); //注意可能会产生孔洞children
 				// minkowski difference failed. very rare but could happen
-				if(!nfp){
+				if (!nfp) {
 					error = true;
 					break;
 				}
 				// shift to placed location
-				for(m=0; m<nfp.length; m++){
+				//新计算的nfp一定要根据参考部件j的摆放位置 做一个偏移
+				for (m = 0; m < nfp.length; m++) {
 					nfp[m].x += placements[j].x;
 					nfp[m].y += placements[j].y;
 				}
-				
-				if(nfp.children && nfp.children.length > 0){
-					for(n=0; n<nfp.children.length; n++){
-						for(var o=0; o<nfp.children[n].length; o++){
+				//内有孔 也要做好偏移修正
+				if (nfp.children && nfp.children.length > 0) {
+					for (n = 0; n < nfp.children.length; n++) {
+						for (var o = 0; o < nfp.children[n].length; o++) {
 							nfp.children[n][o].x += placements[j].x;
 							nfp.children[n][o].y += placements[j].y;
 						}
 					}
 				}
-				
+
+				//下面在转换坐标的同时 也会将结构压平，孔洞children 换好方向，与nfp外框一起放入数组
 				var clipperNfp = nfpToClipperCoordinates(nfp, config);
-				
 				clipper.AddPaths(clipperNfp, ClipperLib.PolyType.ptSubject, true);
 			}
-			
-			if(error || !clipper.Execute(ClipperLib.ClipType.ctUnion, combinedNfp, ClipperLib.PolyFillType.pftNonZero, ClipperLib.PolyFillType.pftNonZero)){
+
+			//将当前部件和之前摆放好部件（包括之前部件的孔）分别nfp 做并集 得到一个总的 nfp（这个polygon进不得）
+			if (error || !clipper.Execute(ClipperLib.ClipType.ctUnion, combinedNfp, ClipperLib.PolyFillType.pftNonZero, ClipperLib.PolyFillType.pftNonZero)) {
 				console.log('clipper error', error);
 				continue;
 			}
-			
+
 			/*var converted = [];
 			for(j=0; j<combinedNfp.length; j++){
 				converted.push(toNestCoordinates(combinedNfp[j], config.clipperScale));
 			}*/
-			
+
+			// clipkey 包括了 部件与角度信息，以此为key，记录下当前位序与nfp。
+			// 以后遇到相同部件相同角度，就可以从当前index算nfp 不用从头算一遍了
 			clipCache[clipkey] = {
 				nfp: combinedNfp,
-				index: placed.length-1
+				index: placed.length - 1
 			};
-			
-			console.log('save cache', placed.length-1);
-			
+
+			console.log('save cache', placed.length - 1);
+
+
+
+			//step3: sheetNfp - prePlacedPartsNfp
+
+			//下面计算 当前部件与sheet内nfp 减去 其他部件合并nfp 得到当前部件nfp
+
 			// difference with sheet polygon
 			var finalNfp = new ClipperLib.Paths();
 			clipper = new ClipperLib.Clipper();
-			
+
 			clipper.AddPaths(combinedNfp, ClipperLib.PolyType.ptClip, true);
-			
+
 			clipper.AddPaths(clipperSheetNfp, ClipperLib.PolyType.ptSubject, true);
-			
-			if(!clipper.Execute(ClipperLib.ClipType.ctDifference, finalNfp, ClipperLib.PolyFillType.pftEvenOdd, ClipperLib.PolyFillType.pftNonZero)){
+
+			if (!clipper.Execute(ClipperLib.ClipType.ctDifference, finalNfp, ClipperLib.PolyFillType.pftEvenOdd, ClipperLib.PolyFillType.pftNonZero)) {
 				continue;
 			}
-			
-			if(!finalNfp || finalNfp.length == 0){
+			if (!finalNfp || finalNfp.length == 0) {
 				continue;
 			}
-			
 			var f = [];
-			for(j=0; j<finalNfp.length; j++){
+			for (j = 0; j < finalNfp.length; j++) {
 				// back to normal scale
 				f.push(toNestCoordinates(finalNfp[j], config.clipperScale));
 			}
 			finalNfp = f;
-						
+
+
+
+
+
+			//step4 finalNfp表示计算出最终nfp
+
+
+
+
+
+
+
 			// choose placement that results in the smallest bounding box/hull etc
 			// todo: generalize gravity direction
 			var minwidth = null;
@@ -999,180 +1104,185 @@ function placeParts(sheets, parts, config, nestindex){
 			var minx = null;
 			var miny = null;
 			var nf, area, shiftvector;
-			
-			var allpoints = [];
-			for(m=0; m<placed.length; m++){
-				for(n=0; n<placed[m].length; n++){
-					allpoints.push({x:placed[m][n].x+placements[m].x, y: placed[m][n].y+placements[m].y});
+
+			var allpoints = [];	//字面意思  全部布局部件的全部点
+			for (m = 0; m < placed.length; m++) {
+				for (n = 0; n < placed[m].length; n++) {
+					allpoints.push({ x: placed[m][n].x + placements[m].x, y: placed[m][n].y + placements[m].y });
 				}
 			}
-			
+
 			var allbounds;
 			var partbounds;
-			if(config.placementType == 'gravity' || config.placementType == 'box'){
+			if (config.placementType == 'gravity' || config.placementType == 'box') {
 				allbounds = GeometryUtil.getPolygonBounds(allpoints);
-				
+
 				var partpoints = [];
-				for(m=0; m<part.length; m++){
-					partpoints.push({x: part[m].x, y:part[m].y});
+				for (m = 0; m < part.length; m++) {
+					partpoints.push({ x: part[m].x, y: part[m].y });
 				}
 				partbounds = GeometryUtil.getPolygonBounds(partpoints);
 			}
-			else{
+			else {
 				allpoints = getHull(allpoints);
 			}
-			for(j=0; j<finalNfp.length; j++){
+
+
+
+
+
+			for (j = 0; j < finalNfp.length; j++) {
 				nf = finalNfp[j];
 				//console.log('evalnf',nf.length);
-				for(k=0; k<nf.length; k++){
-					
+				for (k = 0; k < nf.length; k++) {
+
 					shiftvector = {
-						x: nf[k].x-part[0].x,
-						y: nf[k].y-part[0].y,
+						x: nf[k].x - part[0].x,
+						y: nf[k].y - part[0].y,
 						id: part.id,
 						source: part.source,
 						rotation: part.rotation
 					};
-					
-					
+
+
 					/*for(m=0; m<part.length; m++){
 						localpoints.push({x: part[m].x+shiftvector.x, y:part[m].y+shiftvector.y});
 					}*/
 					//console.time('evalbounds');
-					
-					if(config.placementType == 'gravity' || config.placementType == 'box'){
+
+					if (config.placementType == 'gravity' || config.placementType == 'box') {
 						var rectbounds = GeometryUtil.getPolygonBounds([
 							// allbounds points
-							{x: allbounds.x, y:allbounds.y},
-							{x: allbounds.x+allbounds.width, y:allbounds.y},
-							{x: allbounds.x+allbounds.width, y:allbounds.y+allbounds.height},
-							{x: allbounds.x, y:allbounds.y+allbounds.height},
-							
+							{ x: allbounds.x, y: allbounds.y },
+							{ x: allbounds.x + allbounds.width, y: allbounds.y },
+							{ x: allbounds.x + allbounds.width, y: allbounds.y + allbounds.height },
+							{ x: allbounds.x, y: allbounds.y + allbounds.height },
+
 							// part points
-							{x: partbounds.x+shiftvector.x, y:partbounds.y+shiftvector.y},
-							{x: partbounds.x+partbounds.width+shiftvector.x, y:partbounds.y+shiftvector.y},
-							{x: partbounds.x+partbounds.width+shiftvector.x, y:partbounds.y+partbounds.height+shiftvector.y},
-							{x: partbounds.x+shiftvector.x, y:partbounds.y+partbounds.height+shiftvector.y}
+							{ x: partbounds.x + shiftvector.x, y: partbounds.y + shiftvector.y },
+							{ x: partbounds.x + partbounds.width + shiftvector.x, y: partbounds.y + shiftvector.y },
+							{ x: partbounds.x + partbounds.width + shiftvector.x, y: partbounds.y + partbounds.height + shiftvector.y },
+							{ x: partbounds.x + shiftvector.x, y: partbounds.y + partbounds.height + shiftvector.y }
 						]);
-						
+
 						// weigh width more, to help compress in direction of gravity
-						if(config.placementType == 'gravity'){
-							area = rectbounds.width*2 + rectbounds.height;
+						if (config.placementType == 'gravity') {
+							area = rectbounds.width * 2 + rectbounds.height;
 						}
-						else{
+						else {
 							area = rectbounds.width * rectbounds.height;
 						}
 					}
-					else{
+					else {
 						// must be convex hull
 						var localpoints = clone(allpoints);
-						
-						for(m=0; m<part.length; m++){
-							localpoints.push({x: part[m].x+shiftvector.x, y:part[m].y+shiftvector.y});
+
+						for (m = 0; m < part.length; m++) {
+							localpoints.push({ x: part[m].x + shiftvector.x, y: part[m].y + shiftvector.y });
 						}
-						
+
 						area = Math.abs(GeometryUtil.polygonArea(getHull(localpoints)));
 						shiftvector.hull = getHull(localpoints);
 						shiftvector.hullsheet = getHull(sheet);
 					}
-					
+
 					//console.timeEnd('evalbounds');
 					//console.time('evalmerge');
-					
-					if(config.mergeLines){
+
+					if (config.mergeLines) {
 						// if lines can be merged, subtract savings from area calculation						
 						var shiftedpart = shiftPolygon(part, shiftvector);
 						var shiftedplaced = [];
-						
-						for(m=0; m<placed.length; m++){
+
+						for (m = 0; m < placed.length; m++) {
 							shiftedplaced.push(shiftPolygon(placed[m], placements[m]));
 						}
-						
+
 						// don't check small lines, cut off at about 1/2 in
-						var minlength = 0.5*config.scale;
-						var merged = mergedLength(shiftedplaced, shiftedpart, minlength, 0.1*config.curveTolerance);
-						area -= merged.totalLength*config.timeRatio;
+						var minlength = 0.5 * config.scale;
+						var merged = mergedLength(shiftedplaced, shiftedpart, minlength, 0.1 * config.curveTolerance);
+						area -= merged.totalLength * config.timeRatio;
 					}
-					
+
 					//console.timeEnd('evalmerge');
-					
-					if(
-					minarea === null || 
-					area < minarea || 
-					(GeometryUtil.almostEqual(minarea, area) && (minx === null || shiftvector.x < minx)) ||
-					(GeometryUtil.almostEqual(minarea, area) && (minx !== null && GeometryUtil.almostEqual(shiftvector.x, minx) && shiftvector.y < miny))
-					){
+
+					if (
+						minarea === null ||
+						area < minarea ||
+						(GeometryUtil.almostEqual(minarea, area) && (minx === null || shiftvector.x < minx)) ||
+						(GeometryUtil.almostEqual(minarea, area) && (minx !== null && GeometryUtil.almostEqual(shiftvector.x, minx) && shiftvector.y < miny))
+					) {
 						minarea = area;
 						minwidth = rectbounds ? rectbounds.width : 0;
 						position = shiftvector;
-						if(minx === null || shiftvector.x < minx){
+						if (minx === null || shiftvector.x < minx) {
 							minx = shiftvector.x;
 						}
-						if(miny === null || shiftvector.y < miny){
+						if (miny === null || shiftvector.y < miny) {
 							miny = shiftvector.y;
 						}
-						
-						if(config.mergeLines){
+
+						if (config.mergeLines) {
 							position.mergedLength = merged.totalLength;
 							position.mergedSegments = merged.segments;
 						}
 					}
 				}
 			}
-			
-			if(position){
+
+			if (position) {
 				placed.push(part);
 				placements.push(position);
-				if(position.mergedLength){
+				if (position.mergedLength) {
 					totalMerged += position.mergedLength;
 				}
 			}
-			
+
 			// send placement progress signal
 			var placednum = placed.length;
-			for(j=0; j<allplacements.length; j++){
+			for (j = 0; j < allplacements.length; j++) {
 				placednum += allplacements[j].sheetplacements.length;
 			}
 			//console.log(placednum, totalnum);
-			ipcRenderer.send('background-progress', {index: nestindex, progress: 0.5 + 0.5*(placednum/totalnum)});
+			ipcRenderer.send('background-progress', { index: nestindex, progress: 0.5 + 0.5 * (placednum / totalnum) });
 			console.timeEnd('placement');
 		}
-		
+
 		//if(minwidth){
-		fitness += (minwidth/sheetarea) + minarea;
+		fitness += (minwidth / sheetarea) + minarea;
 		//}
-		
-		for(i=0; i<placed.length; i++){
+
+		for (i = 0; i < placed.length; i++) {
 			var index = parts.indexOf(placed[i]);
-			if(index >= 0){
-				parts.splice(index,1);
+			if (index >= 0) {
+				parts.splice(index, 1);
 			}
 		}
-		
-		if(placements && placements.length > 0){
-			allplacements.push({sheet: sheet.source, sheetid: sheet.id, sheetplacements: placements});
+
+		if (placements && placements.length > 0) {
+			allplacements.push({ sheet: sheet.source, sheetid: sheet.id, sheetplacements: placements });
 		}
-		else{
+		else {
 			break; // something went wrong
 		}
-		
-		if(sheets.length == 0){
+
+		if (sheets.length == 0) {
 			break;
 		}
 	}
-	
+
 	// there were parts that couldn't be placed
 	// scale this value high - we really want to get all the parts in, even at the cost of opening new sheets
-	for(i=0; i<parts.length; i++){
-		fitness += 100000000*(Math.abs(GeometryUtil.polygonArea(parts[i]))/totalsheetarea);
+	for (i = 0; i < parts.length; i++) {
+		fitness += 100000000 * (Math.abs(GeometryUtil.polygonArea(parts[i])) / totalsheetarea);
 	}
 	// send finish progerss signal
-	ipcRenderer.send('background-progress', {index: nestindex, progress: -1});
-	
-	return {placements: allplacements, fitness: fitness, area: sheetarea, mergedLength: totalMerged };
+	ipcRenderer.send('background-progress', { index: nestindex, progress: -1 });
+
+	return { placements: allplacements, fitness: fitness, area: sheetarea, mergedLength: totalMerged };
 }
 
 // clipperjs uses alerts for warnings
-function alert(message) { 
-    console.log('alert: ', message);
+function alert(message) {
+	console.log('alert: ', message);
 }
